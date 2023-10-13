@@ -38,7 +38,7 @@ INCLUDES	:=	include
 EXEFS_SRC	:=	exefs_src
 APP_TITLE	:=	Quick Reboot
 APP_AUTHOR	:=	ndeadly
-APP_VERSION	:=	1.5.5
+APP_VERSION	:=	1.6.0
 ROMFS		:=	romfs
 
 #---------------------------------------------------------------------------------
