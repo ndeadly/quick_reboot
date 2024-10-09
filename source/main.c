@@ -11,6 +11,7 @@ static u8 g_reboot_payload[IRAM_PAYLOAD_MAX_SIZE];
 void userAppExit(void)
 {
     amsBpcExit();
+    bpcExit();
     setsysExit();
     spsmExit();
 }
@@ -35,6 +36,7 @@ int main(int argc, char **argv) {
 
     Result rc = 0;
     bool can_reboot = true;
+    bool is_mariko = false;
 
     if (R_FAILED(rc = romfsInit())) {
         printf("Failed to initialize romfs: 0x%x\n", rc);
@@ -49,36 +51,49 @@ int main(int argc, char **argv) {
         SetSysProductModel model;
         setsysGetProductModel(&model);
         if (model != SetSysProductModel_Nx && model != SetSysProductModel_Copper) {
-            printf("Reboot to payload cannot be used on a Mariko system\n");
-            can_reboot = false;
+            is_mariko = true;
         }
     }
 
-    if (can_reboot && R_FAILED(rc = spsmInitialize())) {
-        printf("Failed to initialize spsm: 0x%x\n", rc);
-        can_reboot = false;
-    }
-
-    if (can_reboot) {
-        smExit(); //Required to connect to ams:bpc
-        if R_FAILED(rc = amsBpcInitialize()) {
-            printf("Failed to initialize ams:bpc: 0x%x\n", rc);
-            can_reboot = false;
+    if (is_mariko) {
+        if (can_reboot) {
+            if (R_FAILED(appletRequestToReboot())) {
+                if (R_FAILED(rc = spsmInitialize())) {
+                    printf("Failed to initialize spsm: 0x%x\n", rc);
+                    can_reboot = false;
+                } else {
+                    spsmShutdown(true);
+                }
+            }
         }
     }
-
-    if (can_reboot) {
-        FILE *f = fopen("romfs:/fusee.bin", "rb");
-        if (f == NULL) {
+    else {
+        if (can_reboot && R_FAILED(rc = spsmInitialize())) {
+            printf("Failed to initialize spsm: 0x%x\n", rc);
             can_reboot = false;
-        } else {
-            fread(g_reboot_payload, 1, sizeof(g_reboot_payload), f);
-            fclose(f);
         }
-    }
 
-    if (can_reboot) {
-        reboot_to_payload();
+        if (can_reboot) {
+            smExit(); //Required to connect to ams:bpc
+            if R_FAILED(rc = amsBpcInitialize()) {
+                printf("Failed to initialize ams:bpc: 0x%x\n", rc);
+                can_reboot = false;
+            }
+        }
+
+        if (can_reboot) {
+            FILE *f = fopen("romfs:/fusee.bin", "rb");
+            if (f == NULL) {
+                can_reboot = false;
+            } else {
+                fread(g_reboot_payload, 1, sizeof(g_reboot_payload), f);
+                fclose(f);
+            }
+        }
+
+        if (can_reboot) {
+            reboot_to_payload();
+        }
     }
 
     // Main loop
